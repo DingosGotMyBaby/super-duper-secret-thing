@@ -14,15 +14,15 @@ Then you can run the bot using the `docker-compose.yml`
 The bot exposes several commands,
 
 * submit_game
-    * Can be used by anyone
-    * Submits a game to be played
+  * Can be used by anyone
+  * Submits a game to be played
 * get_games
-    * Can only be used by admins, mods and the owner
-    * Gets the games to be played
+  * Can only be used by admins, mods and the owner
+  * Gets the games to be played
 * set_user
-    * Can only be used by admins, mods and the owner
-    * Sets a user to a specified user level
-    * Owner can make admins and mods, admins can make mods
+  * Can only be used by admins, mods and the owner
+  * Sets a user to a specified user level
+  * Owner can make admins and mods, admins can make mods
 
 ## Development
 

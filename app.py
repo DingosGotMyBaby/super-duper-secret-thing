@@ -3,6 +3,7 @@ from enum import Enum
 
 import discord
 from discord import app_commands
+from discord.ext.commands import BucketType
 import dotenv
 import os
 import logging
@@ -169,7 +170,10 @@ async def on_ready():
 
 
 @client.event
-async def on_application_command_error(ctx, error):
+async def on_command_error(ctx, error):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await ctx.send(f"{round(error.retry_after, 2)} seconds left")
+        return
     # Handle errors from commands
     await ctx.send(
         f"An error occurred while processing the command: {error}", ephemeral=True
@@ -223,6 +227,7 @@ class Categories(Enum):
 
 # Game Submission command
 @client.tree.command()
+@app_commands.Cooldown(1, 600, BucketType.user)
 @app_commands.describe(url="The Steam URL of the game you want to submit")
 @app_commands.describe(category="The category you want to submit the game to")
 async def submit_game(interaction: discord.Interaction, url: str, category: Categories):
