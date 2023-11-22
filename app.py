@@ -3,7 +3,6 @@ from enum import Enum
 
 import discord
 from discord import app_commands
-from discord.ext.commands import BucketType
 import dotenv
 import os
 import logging
@@ -23,7 +22,8 @@ TOKEN = os.environ["TOKEN"]
 CHANNEL = int(os.environ["CHANNEL"])
 OWNER = int(os.environ["OWNER"])
 
-database_url = "sqlite:///games.db"
+database_url = "sqlite:///data/games.db"
+# database_url = "postgresql://postgres:postgres@localhost:5432/games"
 
 engine = create_engine(database_url)
 
@@ -149,6 +149,19 @@ class MyClient(discord.Client):
         # This copies the global commands over to your guild.
         self.tree.copy_global_to(guild=MY_GUILD)
         await self.tree.sync(guild=MY_GUILD)
+        # seed database before running bot
+        to_seed_categories = get_all_categories()
+        # compare to Categories enum
+        for category in Categories:
+            # if category is not in the database, add it
+            if category.name not in [
+                category.categoryname for category in to_seed_categories
+            ]:
+                add_category(category.name)
+                logging.info(
+                    f"Category {category.name} was not in the database. Adding it now."
+                )
+        logging.info(f"Categories in the database: {get_all_categories()}")
 
 
 intents = discord.Intents.default()
@@ -161,7 +174,7 @@ async def on_ready():
     # print('------')
     logging.info(f"Guilds: {len(client.guilds)}")
     logging.info(
-        f"Invite URL: {discord.utils.oauth_url(client.user.id, permissions=discord.Permissions.all())}"
+        f"Invite URL: {discord.utils.oauth_url(client.user.id, permissions=discord.Permissions(permissions=139653810176))}"
     )
     # logging.info(
     #     "Environment variables loaded. " + str(CHANNEL)
@@ -169,16 +182,26 @@ async def on_ready():
     # print("Environment variables loaded." + str(MY_GUILD) + str(PINNED_MESSAGE) + str(CHANNEL))
 
 
-@client.event
-async def on_command_error(ctx, error):
-    if isinstance(error, app_commands.CommandOnCooldown):
-        await ctx.send(f"{round(error.retry_after, 2)} seconds left")
+@client.tree.error
+async def on_app_command_error(
+    interaction: discord.Interaction, exception: app_commands.AppCommandError
+):
+    if isinstance(exception, app_commands.CommandOnCooldown):
+        await interaction.response.send_message(
+            f"You are on cooldown, try again later!", ephemeral=True
+        )
+        logging.info(
+            f"{interaction.user.name} tried to use a command on cooldown. They have {round(exception.retry_after, 2)} seconds left."
+        )
         return
-    # Handle errors from commands
-    await ctx.send(
-        f"An error occurred while processing the command: {error}", ephemeral=True
-    )
-    logging.warning(f"An error occurred while processing the command: {error}")
+    else:
+        logging.error(f"{interaction.command} raised an exception: {exception}")
+        followup = interaction.followup
+        await followup.send(
+            f"Something went wrong! Tell Dingo to fucking fix it <:Madge:786617980103688262>",
+            ephemeral=True,
+        )
+        return
 
 
 # # Add category command
@@ -227,7 +250,7 @@ class Categories(Enum):
 
 # Game Submission command
 @client.tree.command()
-@app_commands.Cooldown(1, 600, BucketType.user)
+@app_commands.checks.cooldown(1, 600, key=lambda i: (i.guild_id, i.user.id))
 @app_commands.describe(url="The Steam URL of the game you want to submit")
 @app_commands.describe(category="The category you want to submit the game to")
 async def submit_game(interaction: discord.Interaction, url: str, category: Categories):
@@ -439,19 +462,6 @@ async def set_user(
         )
 
         return
-
-
-# seed database before running bot
-to_seed_categories = get_all_categories()
-# compare to Categories enum
-for category in Categories:
-    # if category is not in the database, add it
-    if category.name not in [category.categoryname for category in to_seed_categories]:
-        add_category(category.name)
-        logging.info(
-            f"Category {category.name} was not in the database. Adding it now."
-        )
-logging.info(f"Categories in the database: {get_all_categories()}")
 
 
 client.run(TOKEN)
